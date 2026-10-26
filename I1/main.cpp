@@ -18,6 +18,23 @@ void free_matrix(int ** matrix, size_t allocated_rows)
 
 int ** create_matrix(size_t n, size_t m)
 {
+    const size_t max_size = std::numeric_limits<size_t>::max();
+
+    if (n > max_size / sizeof(int*))
+    {
+        throw std::overflow_error("Переполнение размера памяти для массива указателей");
+    }
+
+    if (m > max_size / sizeof(int))
+    {
+        throw std::overflow_error("Переполнение размера памяти для строки матрицы");
+    }
+
+    if (n > 0 && m > max_size / n)
+    {
+        throw std::overflow_error("Переполнение общего количества элементов матрицы");
+    }
+
     int ** matrix = new int*[n];
     size_t allocated = 0;
     try
@@ -76,18 +93,34 @@ int ** concat_rows(const int * const * lhs, size_t n1, size_t m1, const int * co
             }
         }
     }
-    if (std::numeric_limits<size_t>::max() - m1 < m2)
+
+    const size_t max_size = std::numeric_limits<size_t>::max();
+
+    if (max_size - m1 < m2)
     {
         throw std::overflow_error("Переполнение при сложении m1 + m2");
     }
-
     size_t new_m = m1 + m2;
+
+    if (new_m > max_size / sizeof(int))
+    {
+        throw std::overflow_error("Переполнение размера памяти для объединенной строки");
+    }
+
     size_t max_n = n2;
     size_t min_n = n1;
     if (n1 > n2)
     {
         max_n = n1;
         min_n = n2;
+    }
+    if (max_n > max_size / sizeof(int*))
+    {
+        throw std::overflow_error("Переполнение размера памяти для массива указателей результата");
+    }
+    if (min_n > 0 && new_m > max_size / min_n)
+    {
+        throw std::overflow_error("Переполнение количества элементов в общей части матриц");
     }
 
     int ** result = new int*[max_n];
@@ -110,6 +143,10 @@ int ** concat_rows(const int * const * lhs, size_t n1, size_t m1, const int * co
 
         if (n1 > n2)
         {
+            if (m1 > max_size / sizeof(int))
+            {
+                throw std::overflow_error("Переполнение размера памяти для остатка строк первой матрицы");
+            }
             for (; allocated < max_n; ++allocated)
             {
                 result[allocated] = new int[m1];
@@ -121,6 +158,10 @@ int ** concat_rows(const int * const * lhs, size_t n1, size_t m1, const int * co
         }
         else if (n2 > n1)
         {
+            if (m2 > max_size / sizeof(int))
+            {
+                throw std::overflow_error("Переполнение размера памяти для остатка строк второй матрицы");
+            }
             for (; allocated < max_n; ++allocated)
             {
                 result[allocated] = new int[m2];
@@ -141,6 +182,12 @@ int ** concat_rows(const int * const * lhs, size_t n1, size_t m1, const int * co
 
 void print_jagged_result(const int * const * res, size_t n1, size_t m1, size_t n2, size_t m2)
 {
+    if (std::numeric_limits<size_t>::max() - m1 < m2)
+    {
+        throw std::overflow_error("Переполнение при сложении m1 + m2 в выводе");
+    }
+    size_t new_m = m1 + m2;
+
     size_t max_n = n2;
     size_t min_n = n1;
     if (n1 > n2)
@@ -148,7 +195,6 @@ void print_jagged_result(const int * const * res, size_t n1, size_t m1, size_t n
         max_n = n1;
         min_n = n2;
     }
-    size_t new_m = m1 + m2;
 
     for (size_t i = 0; i < max_n; ++i)
     {
@@ -169,7 +215,7 @@ void print_jagged_result(const int * const * res, size_t n1, size_t m1, size_t n
         for (size_t j = 0; j < current_m; ++j)
         {
             std::cout << res[i][j];
-            if (j + 1 < current_m)
+            if (j < current_m - 1)
             {
                 std::cout << " ";
             }
@@ -195,7 +241,7 @@ int main()
     }
     catch (...)
     {
-        std::cerr << "Не удалось выделить память под первую матрицу\n";
+        std::cerr << "Не удалось выделить память под первую матрицу (или переполнение размера)\n";
         return 2;
     }
 
@@ -222,7 +268,7 @@ int main()
     }
     catch (...)
     {
-        std::cerr << "Не удалось выделить память под вторую матрицу\n";
+        std::cerr << "Не удалось выделить память под вторую матрицу (или переполнение размера)\n";
         free_matrix(lhs, n1);
         return 2;
     }
